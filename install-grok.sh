@@ -141,10 +141,12 @@ def format_account_block(a: dict) -> str:
 def days_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [
-            InlineKeyboardButton(text="3 дня",   callback_data="add_days:3"),
-            InlineKeyboardButton(text="7 дней",  callback_data="add_days:7"),
-            InlineKeyboardButton(text="14 дней", callback_data="add_days:14"),
-            InlineKeyboardButton(text="30 дней", callback_data="add_days:30"),
+            InlineKeyboardButton(text="🟢 3 дня",   callback_data="add_days:3"),
+            InlineKeyboardButton(text="🔵 7 дней",  callback_data="add_days:7"),
+        ],
+        [
+            InlineKeyboardButton(text="🟡 14 дней", callback_data="add_days:14"),
+            InlineKeyboardButton(text="🔴 30 дней", callback_data="add_days:30"),
         ],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="add_cancel")],
     ]
