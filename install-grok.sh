@@ -37,6 +37,7 @@ from html import escape
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
+from aiogram.enums import ButtonStyle
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     Message, CallbackQuery,
@@ -141,14 +142,14 @@ def format_account_block(a: dict) -> str:
 def days_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [
-            InlineKeyboardButton(text="🟢 3 дня",   callback_data="add_days:3"),
-            InlineKeyboardButton(text="🔵 7 дней",  callback_data="add_days:7"),
+            InlineKeyboardButton(text="⚡ 3 дня",   callback_data="add_days:3",  style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="📅 7 дней",  callback_data="add_days:7",  style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="🟡 14 дней", callback_data="add_days:14"),
-            InlineKeyboardButton(text="🔴 30 дней", callback_data="add_days:30"),
+            InlineKeyboardButton(text="🌟 14 дней", callback_data="add_days:14", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="👑 30 дней", callback_data="add_days:30", style=ButtonStyle.SUCCESS),
         ],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="add_cancel")],
+        [InlineKeyboardButton(text="Отмена",        callback_data="add_cancel",  style=ButtonStyle.DANGER)],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -425,7 +426,7 @@ BOTEOF
 echo -e "${GREEN}[✓] bot.py создан${NC}"
 
 cat > requirements.txt << 'EOF'
-aiogram>=3.4,<4
+aiogram>=3.20,<4
 EOF
 
 echo -e "${YELLOW}[→] Создаю виртуальное окружение...${NC}"
