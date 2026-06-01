@@ -26,8 +26,7 @@ echo -e "${YELLOW}[→] Папка установки: ${INSTALL_DIR}${NC}"
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-echo -e "${YELLOW}[→] Создаю bot.py...${NC}"
-cat > bot.py << 'BOTEOF'
+echo -e "${YELLOW}[→] Создаю bot.py...${NC}"cat > bot.py << 'BOTEOF'
 import asyncio
 import json
 import logging
@@ -63,24 +62,32 @@ ACCOUNT_RE = re.compile(
 
 VALID_DAYS = (3, 7, 14, 30)
 
+DAYS_EMOJI = {3: "⚡", 7: "📅", 14: "🌟", 30: "👑"}
+DAYS_COLOR = {
+    3:  ButtonStyle.SUCCESS,
+    7:  ButtonStyle.PRIMARY,
+    14: ButtonStyle.PRIMARY,
+    30: ButtonStyle.SUCCESS,
+}
+
 HELP_TEXT = (
-    "Бот-хранилище аккаунтов Grok.\n\n"
-    "<b>Добавление аккаунтов:</b>\n"
-    "Просто пришли список в формате:\n"
-    "<code>Email : ...\nPassword : ...</code>\n"
-    "Бот распарсит и спросит срок подписки.\n\n"
-    "<b>Команды:</b>\n"
-    "• /list — все аккаунты с типом подписки\n"
-    "• /count — сколько аккаунтов по каждому типу\n"
-    "• /3day — выдать и удалить первый 3-дневный\n"
-    "• /7day — выдать и удалить первый 7-дневный\n"
-    "• /14day — выдать и удалить первый 14-дневный\n"
-    "• /30day — выдать и удалить первый 30-дневный\n"
-    "• /pop — выдать и удалить первый (любой тип)\n"
-    "• /get N — показать аккаунт №N (без удаления)\n"
+    "🤖 <b>Grok Bot — хранилище аккаунтов</b>\n\n"
+    "➕ <b>Добавление:</b>\n"
+    "Отправь аккаунты в формате:\n"
+    "<code>Email : почта@mail.com\n"
+    "Password : пароль123</code>\n"
+    "Бот покажет кнопки выбора срока подписки.\n\n"
+    "📦 <b>Выдача по типу:</b>\n"
+    "• /pop — выбрать тип и выдать аккаунт\n"
+    "• /3day /7day /14day /30day — быстрая выдача\n\n"
+    "📋 <b>Просмотр:</b>\n"
+    "• /list — все аккаунты\n"
+    "• /count — количество по типам\n"
+    "• /get N — показать №N без удаления\n\n"
+    "🗑 <b>Удаление:</b>\n"
     "• /use N [N2 N3…] — удалить по номерам\n"
-    "• /clear — очистить хранилище\n"
-    "• /help — это сообщение"
+    "• /clear — очистить всё хранилище\n\n"
+    "❓ /help — это сообщение"
 )
 
 _lock = asyncio.Lock()
@@ -88,27 +95,39 @@ pending_add: dict[int, list[dict]] = {}
 pending_clear: set[int] = set()
 
 
+# ─── Файловые операции ────────────────────────────────────────────────────────
+
 def load_accounts() -> list[dict]:
     if not DATA_FILE.exists():
         return []
     try:
         data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        changed = False
         for acc in data:
             if "days" not in acc:
                 acc["days"] = 30
+                changed = True
+        # Если были старые аккаунты без поля — сохраняем сразу
+        if changed:
+            _save_raw(data)
         return data
     except Exception as e:
         log.exception("Failed to load %s: %s", DATA_FILE, e)
         return []
 
 
-def save_accounts(accounts: list[dict]) -> None:
+def _save_raw(accounts: list[dict]) -> None:
+    """Внутренняя запись без блокировки (вызывать только внутри _lock)."""
     tmp = DATA_FILE.with_suffix(".tmp")
     tmp.write_text(
         json.dumps(accounts, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     os.replace(tmp, DATA_FILE)
+
+
+def save_accounts(accounts: list[dict]) -> None:
+    _save_raw(accounts)
 
 
 def parse_accounts(text: str) -> list[dict]:
@@ -118,18 +137,10 @@ def parse_accounts(text: str) -> list[dict]:
     ]
 
 
+# ─── Форматирование ───────────────────────────────────────────────────────────
+
 def days_label(days: int) -> str:
-    return {3: "3д", 7: "7д", 14: "14д", 30: "30д"}.get(days, f"{days}д")
-
-
-def format_list(accounts: list[dict]) -> str:
-    if not accounts:
-        return "Хранилище пустое."
-    lines = []
-    for i, a in enumerate(accounts, 1):
-        tag = days_label(a.get("days", 30))
-        lines.append(f"{i}. {a['email']}  |  {a['password']}  [{tag}]")
-    return "\n".join(lines)
+    return f"{DAYS_EMOJI.get(days, '📌')} {days}д"
 
 
 def format_account_block(a: dict) -> str:
@@ -139,24 +150,69 @@ def format_account_block(a: dict) -> str:
     )
 
 
-def days_keyboard() -> InlineKeyboardMarkup:
+def format_list(accounts: list[dict]) -> str:
+    if not accounts:
+        return "Хранилище пустое."
+
+    # Группируем по типу подписки
+    groups: dict[int, list[tuple[int, dict]]] = {}
+    for i, a in enumerate(accounts, 1):
+        d = a.get("days", 30)
+        groups.setdefault(d, []).append((i, a))
+
+    lines = []
+    for d in sorted(groups.keys()):
+        emoji = DAYS_EMOJI.get(d, "📌")
+        group = groups[d]
+        lines.append(f"\n{emoji} <b>{d} дней</b> — {len(group)} шт.")
+        for idx, a in group:
+            lines.append(f"  {idx}. <code>{escape(a['email'])}</code>  |  <code>{escape(a['password'])}</code>")
+
+    return "\n".join(lines)
+
+
+# ─── Клавиатуры ───────────────────────────────────────────────────────────────
+
+def days_keyboard(prefix: str) -> InlineKeyboardMarkup:
+    """prefix = 'add' для добавления, 'pop' для выдачи."""
     buttons = [
         [
-            InlineKeyboardButton(text="⚡ 3 дня",   callback_data="add_days:3",  style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton(text="📅 7 дней",  callback_data="add_days:7",  style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(
+                text=f"⚡ 3 дня",
+                callback_data=f"{prefix}_days:3",
+                style=ButtonStyle.SUCCESS,
+            ),
+            InlineKeyboardButton(
+                text=f"📅 7 дней",
+                callback_data=f"{prefix}_days:7",
+                style=ButtonStyle.PRIMARY,
+            ),
         ],
         [
-            InlineKeyboardButton(text="🌟 14 дней", callback_data="add_days:14", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="👑 30 дней", callback_data="add_days:30", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(
+                text=f"🌟 14 дней",
+                callback_data=f"{prefix}_days:14",
+                style=ButtonStyle.PRIMARY,
+            ),
+            InlineKeyboardButton(
+                text=f"👑 30 дней",
+                callback_data=f"{prefix}_days:30",
+                style=ButtonStyle.SUCCESS,
+            ),
         ],
-        [InlineKeyboardButton(text="Отмена",        callback_data="add_cancel",  style=ButtonStyle.DANGER)],
+        [
+            InlineKeyboardButton(
+                text="Отмена",
+                callback_data=f"{prefix}_cancel",
+                style=ButtonStyle.DANGER,
+            )
+        ],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def is_admin(message: Message) -> bool:
-    return message.from_user is not None and message.from_user.id == ADMIN_ID
-
+def is_admin(msg: Message) -> bool:
+    return msg.from_user is not None and msg.from_user.id == ADMIN_ID
 
 def is_admin_cb(cb: CallbackQuery) -> bool:
     return cb.from_user is not None and cb.from_user.id == ADMIN_ID
@@ -164,6 +220,8 @@ def is_admin_cb(cb: CallbackQuery) -> bool:
 
 dp = Dispatcher()
 
+
+# ─── Базовые команды ──────────────────────────────────────────────────────────
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
@@ -186,20 +244,20 @@ async def cmd_count(message: Message):
     accounts = load_accounts()
     total = len(accounts)
     if total == 0:
-        await message.answer("Хранилище пустое.")
+        await message.answer("📭 Хранилище пустое.")
         return
-    breakdown = {}
+    breakdown: dict[int, int] = {}
     for a in accounts:
         d = a.get("days", 30)
         breakdown[d] = breakdown.get(d, 0) + 1
-    lines = [f"В хранилище: <b>{total}</b> шт.\n"]
+    lines = [f"📊 <b>В хранилище: {total} шт.</b>\n"]
     for d in VALID_DAYS:
         cnt = breakdown.get(d, 0)
-        if cnt:
-            lines.append(f"  • {d} дней: <b>{cnt}</b>")
+        emoji = DAYS_EMOJI.get(d, "📌")
+        lines.append(f"  {emoji} <b>{d} дней:</b> {cnt} шт.")
     for d, cnt in sorted(breakdown.items()):
         if d not in VALID_DAYS:
-            lines.append(f"  • {d} дней: <b>{cnt}</b>")
+            lines.append(f"  📌 <b>{d} дней:</b> {cnt} шт.")
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 
@@ -208,11 +266,14 @@ async def cmd_list(message: Message):
     if not is_admin(message):
         return
     accounts = load_accounts()
-    text = format_list(accounts)
-    header = f"Всего: {len(accounts)} шт.\n\n"
-    full = header + text
-    for chunk_start in range(0, len(full), 3500):
-        await message.answer(full[chunk_start:chunk_start + 3500])
+    if not accounts:
+        await message.answer("📭 Хранилище пустое.")
+        return
+    header = f"📋 <b>Хранилище — {len(accounts)} шт.</b>"
+    body   = format_list(accounts)
+    full   = header + "\n" + body
+    for chunk_start in range(0, len(full), 3800):
+        await message.answer(full[chunk_start:chunk_start + 3800], parse_mode="HTML")
 
 
 @dp.message(Command("get"))
@@ -229,42 +290,86 @@ async def cmd_get(message: Message, command):
         await message.answer(f"Нет аккаунта №{n}. Всего: {len(accounts)}.")
         return
     a = accounts[n - 1]
-    tag = days_label(a.get("days", 30))
     await message.answer(
-        f"{n}. [{tag}]\n{format_account_block(a)}",
+        f"#{n} {days_label(a.get('days', 30))}\n{format_account_block(a)}",
         parse_mode="HTML",
     )
 
+
+# ─── /pop с выбором типа ──────────────────────────────────────────────────────
 
 @dp.message(Command("pop"))
 async def cmd_pop(message: Message):
     if not is_admin(message):
         return
-    async with _lock:
-        accounts = load_accounts()
-        if not accounts:
-            await message.answer("Хранилище пустое.")
-            return
-        a = accounts.pop(0)
-        save_accounts(accounts)
-    tag = days_label(a.get("days", 30))
+    accounts = load_accounts()
+    if not accounts:
+        await message.answer("📭 Хранилище пустое.")
+        return
+    # Подсчитаем доступные типы
+    available = {}
+    for a in accounts:
+        d = a.get("days", 30)
+        available[d] = available.get(d, 0) + 1
+    summary = "  ".join(
+        f"{DAYS_EMOJI.get(d,'📌')}{d}д: {cnt}"
+        for d, cnt in sorted(available.items())
+    )
     await message.answer(
-        f"Выдан и удалён [{tag}]:\n{format_account_block(a)}\n\nОсталось: {len(accounts)} шт.",
+        f"📦 Выбери тип подписки для выдачи:\n<i>{summary}</i>",
+        reply_markup=days_keyboard("pop"),
         parse_mode="HTML",
     )
 
 
-async def pop_by_days(message: Message, days: int) -> None:
+@dp.callback_query(F.data.startswith("pop_days:"))
+async def cb_pop_days(cb: CallbackQuery):
+    if not is_admin_cb(cb):
+        await cb.answer("Нет доступа.", show_alert=True)
+        return
+    days = int(cb.data.split(":")[1])
     async with _lock:
         accounts = load_accounts()
         match = next((a for a in accounts if a.get("days", 30) == days), None)
         if not match:
-            await message.answer(f"Нет аккаунтов с подпиской {days} дней.")
+            await cb.answer(f"Нет аккаунтов с подпиской {days} дней.", show_alert=True)
+            await cb.message.edit_reply_markup(reply_markup=None)
+            return
+        accounts.remove(match)
+        save_accounts(accounts)
+    await cb.answer("✅ Выдан!")
+    await cb.message.edit_text(
+        f"📤 Выдан и удалён {days_label(days)}:\n"
+        f"{format_account_block(match)}\n\n"
+        f"<i>Осталось: {len(accounts)} шт.</i>",
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data == "pop_cancel")
+async def cb_pop_cancel(cb: CallbackQuery):
+    if not is_admin_cb(cb):
+        await cb.answer("Нет доступа.", show_alert=True)
+        return
+    await cb.answer("Отменено.")
+    await cb.message.edit_text("❌ Выдача отменена.")
+
+
+# ─── Быстрые команды /Nday ────────────────────────────────────────────────────
+
+async def _pop_by_days(message: Message, days: int) -> None:
+    async with _lock:
+        accounts = load_accounts()
+        match = next((a for a in accounts if a.get("days", 30) == days), None)
+        if not match:
+            await message.answer(f"📭 Нет аккаунтов с подпиской {days} дней.")
             return
         accounts.remove(match)
         save_accounts(accounts)
     await message.answer(
-        f"Выдан и удалён [{days}д]:\n{format_account_block(match)}\n\nОсталось: {len(accounts)} шт.",
+        f"📤 Выдан и удалён {days_label(days)}:\n"
+        f"{format_account_block(match)}\n\n"
+        f"<i>Осталось: {len(accounts)} шт.</i>",
         parse_mode="HTML",
     )
 
@@ -272,26 +377,25 @@ async def pop_by_days(message: Message, days: int) -> None:
 @dp.message(Command("3day"))
 async def cmd_3day(message: Message):
     if not is_admin(message): return
-    await pop_by_days(message, 3)
-
+    await _pop_by_days(message, 3)
 
 @dp.message(Command("7day"))
 async def cmd_7day(message: Message):
     if not is_admin(message): return
-    await pop_by_days(message, 7)
-
+    await _pop_by_days(message, 7)
 
 @dp.message(Command("14day"))
 async def cmd_14day(message: Message):
     if not is_admin(message): return
-    await pop_by_days(message, 14)
-
+    await _pop_by_days(message, 14)
 
 @dp.message(Command("30day"))
 async def cmd_30day(message: Message):
     if not is_admin(message): return
-    await pop_by_days(message, 30)
+    await _pop_by_days(message, 30)
 
+
+# ─── Удаление по номерам ──────────────────────────────────────────────────────
 
 @dp.message(Command("use"))
 async def cmd_use(message: Message, command):
@@ -313,16 +417,18 @@ async def cmd_use(message: Message, command):
         save_accounts(accounts)
     parts = []
     if removed:
-        removed_lines = [
-            f"№{n}: {a['email']} [{days_label(a.get('days', 30))}]"
+        lines = [
+            f"  №{n}: {escape(a['email'])} {days_label(a.get('days', 30))}"
             for n, a in sorted(removed)
         ]
-        parts.append("Удалены:\n" + "\n".join(removed_lines))
+        parts.append("🗑 <b>Удалены:</b>\n" + "\n".join(lines))
     if skipped:
-        parts.append("Не найдены: " + ", ".join(f"№{n}" for n in skipped))
-    parts.append(f"Осталось: {len(accounts)} шт.")
-    await message.answer("\n\n".join(parts))
+        parts.append("⚠️ Не найдены: " + ", ".join(f"№{n}" for n in skipped))
+    parts.append(f"<i>Осталось: {len(accounts)} шт.</i>")
+    await message.answer("\n\n".join(parts), parse_mode="HTML")
 
+
+# ─── Очистка ──────────────────────────────────────────────────────────────────
 
 @dp.message(Command("clear"))
 async def cmd_clear(message: Message):
@@ -330,9 +436,10 @@ async def cmd_clear(message: Message):
         return
     pending_clear.add(message.from_user.id)
     await message.answer(
-        "Точно очистить ВСЁ хранилище? Ответь /yes для подтверждения или /no для отмены."
+        "⚠️ <b>Точно очистить ВСЁ хранилище?</b>\n"
+        "Ответь /yes для подтверждения или /no для отмены.",
+        parse_mode="HTML",
     )
-
 
 @dp.message(Command("yes"))
 async def cmd_yes(message: Message):
@@ -342,8 +449,7 @@ async def cmd_yes(message: Message):
         pending_clear.discard(message.from_user.id)
         async with _lock:
             save_accounts([])
-        await message.answer("Хранилище очищено.")
-
+        await message.answer("✅ Хранилище очищено.")
 
 @dp.message(Command("no"))
 async def cmd_no(message: Message):
@@ -351,8 +457,10 @@ async def cmd_no(message: Message):
         return
     if message.from_user.id in pending_clear:
         pending_clear.discard(message.from_user.id)
-        await message.answer("Отменено.")
+        await message.answer("❌ Отменено.")
 
+
+# ─── Добавление аккаунтов ────────────────────────────────────────────────────
 
 @dp.message(F.text)
 async def handle_text(message: Message):
@@ -360,12 +468,18 @@ async def handle_text(message: Message):
         return
     parsed = parse_accounts(message.text or "")
     if not parsed:
-        await message.answer("Не нашёл аккаунтов в сообщении. /help для справки.")
+        await message.answer("Не нашёл аккаунтов. /help для справки.")
         return
+    # Если уже было ожидающее добавление — предупреждаем
+    if message.from_user.id in pending_add:
+        await message.answer(
+            "⚠️ Предыдущая партия заменена новой. Выбери срок для новых аккаунтов:"
+        )
     pending_add[message.from_user.id] = parsed
     await message.answer(
-        f"Найдено <b>{len(parsed)}</b> аккаунт(ов).\nВыбери срок подписки:",
-        reply_markup=days_keyboard(),
+        f"📥 Найдено <b>{len(parsed)}</b> аккаунт(ов).\n"
+        f"Выбери срок подписки:",
+        reply_markup=days_keyboard("add"),
         parse_mode="HTML",
     )
 
@@ -395,12 +509,12 @@ async def cb_add_days(cb: CallbackQuery):
                 existing.add(a["email"].lower())
                 added += 1
         save_accounts(accounts)
-    tag = days_label(days)
-    msg = f"✅ Добавлено: <b>{added}</b> шт. [{tag}]"
+    emoji = DAYS_EMOJI.get(days, "📌")
+    msg = f"✅ Добавлено: <b>{added}</b> шт. {emoji} {days}д"
     if dupes:
-        msg += f"\nПропущено дублей: {dupes}"
-    msg += f"\nВсего в хранилище: {len(accounts)} шт."
-    await cb.answer(f"Добавлено {added} шт. [{tag}]")
+        msg += f"\n⚠️ Пропущено дублей: {dupes}"
+    msg += f"\n<i>Всего в хранилище: {len(accounts)} шт.</i>"
+    await cb.answer(f"Добавлено {added} шт.")
     await cb.message.edit_text(msg, parse_mode="HTML")
 
 
@@ -413,6 +527,8 @@ async def cb_add_cancel(cb: CallbackQuery):
     await cb.answer("Отменено.")
     await cb.message.edit_text("❌ Добавление отменено.")
 
+
+# ─── Запуск ───────────────────────────────────────────────────────────────────
 
 async def main():
     bot = Bot(token=BOT_TOKEN)
