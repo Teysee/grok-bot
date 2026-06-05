@@ -224,7 +224,15 @@ MK = main_keyboard()  # один экземпляр на весь процесс
 async def cmd_start(message: Message):
     if not is_admin(message):
         return
-    await message.answer(HELP_TEXT, parse_mode="HTML", reply_markup=MK)
+    # Сообщение 1: справка (без клавиатуры, можно удалить)
+    await message.answer(HELP_TEXT, parse_mode="HTML")
+    # Сообщение 2: якорь для клавиатуры (не удалять!)
+    await message.answer(
+        "⌨️ <b>Панель управления</b>\n"
+        "<i>Не удаляй это сообщение — оно держит кнопки внизу.</i>",
+        parse_mode="HTML",
+        reply_markup=MK,
+    )
 
 
 @dp.message(Command("help"))
