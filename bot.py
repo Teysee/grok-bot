@@ -560,7 +560,7 @@ async def main():
     log.info("Bot starting. Admin ID: %s. Data file: %s", ADMIN_ID, DATA_FILE.resolve())
 
     # Команды в кнопке "Меню" в поле ввода
-    from aiogram.types import BotCommand
+    from aiogram.types import BotCommand, MenuButtonCommands
     await bot.set_my_commands([
         BotCommand(command="start",  description="🏠 Главное меню"),
         BotCommand(command="list",   description="📋 Все аккаунты"),
@@ -574,7 +574,9 @@ async def main():
         BotCommand(command="clear",  description="⚠️ Очистить хранилище"),
         BotCommand(command="help",   description="❓ Помощь"),
     ])
-    log.info("Commands registered.")
+    # Кнопка «Меню» в поле ввода
+    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    log.info("Commands and menu button registered.")
 
     await dp.start_polling(bot)
 
