@@ -558,6 +558,24 @@ async def cb_add_cancel(cb: CallbackQuery):
 async def main():
     bot = Bot(token=BOT_TOKEN)
     log.info("Bot starting. Admin ID: %s. Data file: %s", ADMIN_ID, DATA_FILE.resolve())
+
+    # Команды в кнопке "Меню" в поле ввода
+    from aiogram.types import BotCommand
+    await bot.set_my_commands([
+        BotCommand(command="start",  description="🏠 Главное меню"),
+        BotCommand(command="list",   description="📋 Все аккаунты"),
+        BotCommand(command="count",  description="📊 Количество по типам"),
+        BotCommand(command="pop",    description="📦 Выдать аккаунт (с выбором)"),
+        BotCommand(command="3day",   description="⚡ Выдать 3-дневный"),
+        BotCommand(command="7day",   description="📅 Выдать 7-дневный"),
+        BotCommand(command="14day",  description="🌟 Выдать 14-дневный"),
+        BotCommand(command="30day",  description="👑 Выдать 30-дневный"),
+        BotCommand(command="use",    description="🗑 Удалить по номеру"),
+        BotCommand(command="clear",  description="⚠️ Очистить хранилище"),
+        BotCommand(command="help",   description="❓ Помощь"),
+    ])
+    log.info("Commands registered.")
+
     await dp.start_polling(bot)
 
 
