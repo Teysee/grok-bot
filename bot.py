@@ -94,6 +94,8 @@ CE_D7   = _e(ID_D7,  "📅")
 CE_D14  = _e(ID_D14, "🌟")
 CE_D30  = _e(ID_D30, "👑")
 CE_D60  = _e(ID_D60, "🔥")
+# Маркер строк в тексте сообщения «выбери срок подписки»
+CE_DAY  = _e("5307843983102204243", "📋")
 
 
 # ─── Паттерны парсинга аккаунтов ─────────────────────────────────────────────
@@ -678,7 +680,7 @@ async def handle_grok_button(message: Message):
     for d in VALID_DAYS:
         acc_cnt = acc_bd.get(d, 0)
         cdk_cnt = cdk_bd.get(d, 0)
-        em = DAYS_EMOJI.get(d, CE_PIN)
+        em = CE_DAY
         if d in CDK_ONLY:
             lines.append(f"{em} {d}д: CDK {cdk_cnt} (только CDK)")
         elif d in CDK_SUPPORTED:
