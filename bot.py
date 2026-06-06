@@ -117,16 +117,6 @@ CDK_PATTERNS = [
 
 HELP_TEXT = (
     f"{CE_BOX} <b>Склад подписок</b>\n\n"
-    f"➕ <b>Как добавлять:</b>\n"
-    f"• <b>Grok-аккаунт</b> — любой формат email+пароль\n"
-    f"  <code>mail@x.com|pass</code>  /  <code>mail@x.com:pass</code>\n"
-    f"  <code>Email: mail@x.com\nPassword: pass</code>\n"
-    f"• <b>CDK 3 дня</b>  — <code>3TG-XXXXXXXX</code>\n"
-    f"• <b>CDK 30 дней</b> — <code>bbgXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</code>\n"
-    f"• <b>CDK 60 дней</b> — <code>GGG-XXXXXXXXXXXXXXXXX</code>\n"
-    f"  CDK распознаётся автоматически → сразу в нужный склад\n"
-    f"• <b>Gemini</b> — ссылка <code>https://serviceactivation.google.com/...</code>\n"
-    f"  → сразу в Gemini-склад\n\n"
     f"{CE_OUT} <b>Как выдавать:</b>\n"
     f"Нажми {CE_GROK} <b>Grok</b> или {CE_GEMINI} <b>Gemini</b> → выбери нужный тип\n\n"
     f"{CE_LIST} /list — список Grok-аккаунтов\n"
