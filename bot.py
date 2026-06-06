@@ -485,6 +485,38 @@ async def cmd_no(message: Message):
         await message.answer(f"{CE_NO} Отменено.", parse_mode="HTML", reply_markup=MK)
 
 
+# ─── /getchar — вытащить сырой символ кастомного эмодзи для кнопок ──────────
+
+@dp.message(Command("getchar"))
+async def cmd_getchar(message: Message):
+    if not is_admin(message):
+        return
+    # Работает и с ответом на сообщение, и с самим сообщением
+    target = message.reply_to_message or message
+    entities = target.entities or []
+    custom = [e for e in entities if e.type == "custom_emoji"]
+    if not custom:
+        await message.answer(
+            "Не нашёл кастомных эмодзи.\n"
+            "Отправь сообщение с кастомным эмодзи из пака, затем ответь на него /getchar",
+            reply_markup=MK,
+        )
+        return
+    txt = target.text or ""
+    lines = ["<b>Символы кастомных эмодзи:</b>\n"]
+    for ent in custom:
+        char = txt[ent.offset : ent.offset + ent.length]
+        codepoints = " ".join(f"U+{ord(c):04X}" for c in char)
+        py_repr = repr(char)
+        lines.append(
+            f"ID: <code>{ent.custom_emoji_id}</code>\n"
+            f"Символ: {char}\n"
+            f"Python repr: <code>{escape(py_repr)}</code>\n"
+            f"Codepoints: <code>{codepoints}</code>\n"
+        )
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=MK)
+
+
 # ─── /settoken ────────────────────────────────────────────────────────────────
 
 @dp.message(Command("settoken"))
