@@ -59,11 +59,21 @@ RE_GEMINI_URL = re.compile(
 )
 GEMINI_PREFIX = "https://serviceactivation.google.com/subscription/new/"
 
-VALID_DAYS = (3, 7, 14, 30)
-DAYS_EMOJI = {3: "⚡", 7: "📅", 14: "🌟", 30: "👑"}
+VALID_DAYS = (3, 7, 14, 30, 60)
+DAYS_EMOJI = {3: "⚡", 7: "📅", 14: "🌟", 30: "👑", 60: "🔥"}
 
-# Типы подписки, у которых есть CDK (3TG- коды)
-CDK_SUPPORTED = {3}   # 30 — кнопка есть, но коды пока не добавлены
+# Типы подписки, у которых есть CDK
+CDK_SUPPORTED = {3, 30, 60}
+# Типы подписки, у которых ТОЛЬКО CDK (аккаунтов нет)
+CDK_ONLY = {60}
+
+# Паттерны CDK-ключей: (regex, days)
+CDK_PATTERNS = [
+    (re.compile(r"^3TG-[A-Z0-9]+$",                    re.IGNORECASE), 3),   # ⚡ 3 дня
+    (re.compile(r"^bbg[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                                                        re.IGNORECASE), 30),  # 👑 30 дней (1 мес)
+    (re.compile(r"^GGG-[A-Z0-9]+$",                    re.IGNORECASE), 60),  # 🔥 60 дней (2 мес)
+]
 
 HELP_TEXT = (
     "📦 <b>Склад подписок</b>\n\n"
@@ -71,7 +81,10 @@ HELP_TEXT = (
     "• <b>Grok-аккаунт</b> — любой формат email+пароль\n"
     "  <code>mail@x.com|pass</code>  /  <code>mail@x.com:pass</code>\n"
     "  <code>Email: mail@x.com\nPassword: pass</code>\n"
-    "• <b>CDK (3 дня)</b> — код <code>3TG-XXXXXXXX</code>  → сразу в CDK-склад\n"
+    "• <b>CDK 3 дня</b>  — <code>3TG-XXXXXXXX</code>\n"
+    "• <b>CDK 30 дней</b> — <code>bbgXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</code>\n"
+    "• <b>CDK 60 дней</b> — <code>GGG-XXXXXXXXXXXXXXXXX</code>\n"
+    "  CDK распознаётся автоматически → сразу в нужный склад\n"
     "• <b>Gemini</b> — ссылка <code>https://serviceactivation.google.com/...</code>\n"
     "  → сразу в Gemini-склад\n\n"
     "📤 <b>Как выдавать:</b>\n"
@@ -212,12 +225,15 @@ MK = main_keyboard()
 def grok_days_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="⚡ 3 дня",   callback_data="grok_d:3",  style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton(text="📅 7 дней",  callback_data="grok_d:7",  style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="⚡ 3 дня",    callback_data="grok_d:3",  style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="📅 7 дней",   callback_data="grok_d:7",  style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="🌟 14 дней", callback_data="grok_d:14", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="👑 30 дней", callback_data="grok_d:30", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="🌟 14 дней",  callback_data="grok_d:14", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="👑 30 дней",  callback_data="grok_d:30", style=ButtonStyle.SUCCESS),
+        ],
+        [
+            InlineKeyboardButton(text="🔥 60 дней (CDK)", callback_data="grok_d:60", style=ButtonStyle.SUCCESS),
         ],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
     ])
@@ -318,6 +334,8 @@ async def _send_count(message: Message) -> None:
             d = a.get("days", 30)
             bd[d] = bd.get(d, 0) + 1
         for d in VALID_DAYS:
+            if d in CDK_ONLY:
+                continue  # 60д — только CDK, аккаунтов нет
             lines.append(f"  {DAYS_EMOJI.get(d,'📌')} {d}д: <b>{bd.get(d, 0)}</b> шт.")
         lines.append(f"  Итого: <b>{len(accounts)}</b> шт.")
     else:
@@ -560,7 +578,9 @@ async def handle_grok_button(message: Message):
         acc_cnt = acc_bd.get(d, 0)
         cdk_cnt = cdk_bd.get(d, 0)
         em = DAYS_EMOJI.get(d, "📌")
-        if d in CDK_SUPPORTED:
+        if d in CDK_ONLY:
+            lines.append(f"{em} {d}д: CDK {cdk_cnt} (только CDK)")
+        elif d in CDK_SUPPORTED:
             lines.append(f"{em} {d}д: акк {acc_cnt} | CDK {cdk_cnt}")
         else:
             lines.append(f"{em} {d}д: акк {acc_cnt}")
@@ -615,23 +635,29 @@ async def cb_grok_days(cb: CallbackQuery):
     days = int(cb.data.split(":")[1])
     await cb.answer()
 
-    if days in CDK_SUPPORTED:
+    if days in CDK_ONLY:
+        # 60 дней — только CDK, аккаунтов нет
+        cdk_list = load_cdk()
+        cdk_cnt = sum(1 for c in cdk_list if c.get("days") == days)
+        await cb.message.edit_text(
+            f"{DAYS_EMOJI[days]} <b>{days} дней — только CDK:</b>\n"
+            f"🔑 CDK в наличии: {cdk_cnt} шт.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔑 Получить CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
+            ]),
+            parse_mode="HTML",
+        )
+    elif days in CDK_SUPPORTED:
+        # 3 и 30 дней — аккаунты + CDK
         accounts = load_accounts()
         cdk_list = load_cdk()
         acc_cnt = sum(1 for a in accounts if a.get("days", 30) == days)
-        cdk_cnt = sum(1 for c in cdk_list if c.get("days", 3) == days)
+        cdk_cnt = sum(1 for c in cdk_list if c.get("days") == days)
         await cb.message.edit_text(
             f"{DAYS_EMOJI[days]} <b>{days} дней — выбери тип:</b>\n"
             f"📧 Аккаунты: {acc_cnt} шт.   🔑 CDK: {cdk_cnt} шт.",
             reply_markup=grok_type_keyboard(days, has_cdk=True), parse_mode="HTML",
-        )
-    elif days == 30:
-        accounts = load_accounts()
-        acc_cnt = sum(1 for a in accounts if a.get("days", 30) == days)
-        await cb.message.edit_text(
-            f"{DAYS_EMOJI[days]} <b>30 дней — выбери тип:</b>\n"
-            f"📧 Аккаунты: {acc_cnt} шт.   🔑 CDK: пока недоступно",
-            reply_markup=grok_type_keyboard(days, has_cdk=False), parse_mode="HTML",
         )
     else:
         # 7 и 14 дней — только аккаунты, сразу выдаём
@@ -694,10 +720,6 @@ async def cb_grok_cdk(cb: CallbackQuery):
     )
     await cb.message.answer("⬆️ CDK выдан выше", reply_markup=MK)
 
-
-@dp.callback_query(F.data == "grok_cdk_soon")
-async def cb_grok_cdk_soon(cb: CallbackQuery):
-    await cb.answer("CDK для 30 дней пока не добавлены.", show_alert=True)
 
 
 @dp.callback_query(F.data == "grok_cancel")
@@ -763,24 +785,37 @@ async def handle_text(message: Message):
         return
     text = (message.text or "").strip()
 
-    # ── CDK: строка(и) вида 3TG-XXXXX ──────────────────────────────────────
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    cdk_lines = [l for l in lines if re.match(r"^3TG-[A-Z0-9]+$", l, re.IGNORECASE)]
-    if cdk_lines and cdk_lines[0].upper().startswith("3TG-"):
-        new_codes = [{"code": l.upper(), "days": 3} for l in cdk_lines]
+    # ── CDK: строки вида 3TG-…, bbg…-…, GGG-… ──────────────────────────────
+    raw_lines = [l.strip() for l in text.splitlines() if l.strip()]
+    detected_cdk: list[dict] = []
+    for line in raw_lines:
+        for pattern, days in CDK_PATTERNS:
+            if pattern.match(line):
+                detected_cdk.append({"code": line, "days": days})
+                break
+    if detected_cdk:
         async with _lock:
             cdk_list = load_cdk()
             existing = {c["code"].upper() for c in cdk_list}
             added, dupes = 0, 0
-            for c in new_codes:
-                if c["code"] in existing:
+            by_days: dict[int, int] = {}
+            for c in detected_cdk:
+                key = c["code"].upper()
+                if key in existing:
                     dupes += 1
                 else:
-                    cdk_list.append(c)
-                    existing.add(c["code"])
+                    cdk_list.append({"code": c["code"], "days": c["days"]})
+                    existing.add(key)
+                    by_days[c["days"]] = by_days.get(c["days"], 0) + 1
                     added += 1
             save_cdk(cdk_list)
-        msg = f"🔑 CDK добавлено: <b>{added}</b> шт. ⚡ 3д"
+        if added:
+            detail = "  ".join(
+                f"{DAYS_EMOJI.get(d,'📌')}{d}д: {cnt}" for d, cnt in sorted(by_days.items())
+            )
+            msg = f"🔑 CDK добавлено: <b>{added}</b> шт. ({detail})"
+        else:
+            msg = "🔑 CDK: все коды уже были в хранилище."
         if dupes:
             msg += f"\n⚠️ Дублей: {dupes}"
         msg += f"\n<i>Всего CDK: {len(cdk_list)} шт.</i>"
