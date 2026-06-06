@@ -32,6 +32,43 @@ if not BOT_TOKEN:
 if not ADMIN_ID:
     raise SystemExit("ADMIN_ID env var is required")
 
+
+# ─── Кастомные эмодзи (только в parse_mode="HTML") ───────────────────────────
+
+def _e(eid: str, fb: str) -> str:
+    """Обернуть кастомный эмодзи Telegram в HTML-тег."""
+    return f'<tg-emoji emoji-id="{eid}">{fb}</tg-emoji>'
+
+# Главное меню / разделы
+CE_GROK   = _e("5319288443153445517", "🤖")
+CE_GEMINI = _e("5321197740800120767", "💎")
+CE_LIST   = _e("5251308525426075254", "📋")
+CE_COUNT  = _e("5251579679596372458", "📊")
+CE_HELP   = _e("5251588462804491181", "❓")
+# Действия
+CE_BOX    = _e("5251382119690688965", "📦")
+CE_OUT    = _e("5251748480401036448", "📤")
+CE_IN     = _e("5251748480401036448", "📥")
+CE_EMPTY  = _e("5251650168599632938", "📭")
+CE_OK     = _e("5251468620332032765", "✅")
+CE_NO     = _e("5249143075929873801", "❌")
+CE_WARN   = _e("5251753939304471410", "⚠️")
+CE_TRASH  = _e("5251625210544677220", "🗑")
+CE_KEY    = _e("5251329076844584285", "🔑")
+CE_EMAIL  = _e("5251519597298868587", "📧")
+CE_UP     = _e("5251625880559574052", "⬆️")
+CE_TIP    = _e("5251621409498619170", "💡")
+CE_KBD    = _e("5251317888454777310", "⌨️")
+CE_HOME   = _e("5251606986998439430", "🏠")
+CE_PIN    = _e("5251504131121634870", "📌")
+# Дни подписки
+CE_D3   = _e("5251356470145996194", "⚡")
+CE_D7   = _e("5251521246566307049", "📅")
+CE_D14  = _e("5251307915540716107", "🌟")
+CE_D30  = _e("5251443675161976035", "👑")
+CE_D60  = _e("5249101449106840434", "🔥")
+
+
 # ─── Паттерны парсинга аккаунтов ─────────────────────────────────────────────
 RE_LABELED = re.compile(
     r"(?:E-?mail|Login|User(?:name)?|Логин|Почта|Account)\s*[:\-]\s*(\S+)"
@@ -57,10 +94,13 @@ RE_SPACE = re.compile(
 RE_GEMINI_URL = re.compile(
     r"https://serviceactivation\.google\.com/subscription/new/\S+"
 )
-GEMINI_PREFIX = "https://serviceactivation.google.com/subscription/new/"
 
 VALID_DAYS = (3, 7, 14, 30, 60)
-DAYS_EMOJI = {3: "⚡", 7: "📅", 14: "🌟", 30: "👑", 60: "🔥"}
+
+# Кастомные эмодзи для сроков (в тексте сообщений, HTML)
+DAYS_EMOJI = {3: CE_D3, 7: CE_D7, 14: CE_D14, 30: CE_D30, 60: CE_D60}
+# Обычные эмодзи для сроков (в тексте кнопок — HTML не работает)
+DAYS_EMOJI_P = {3: "⚡", 7: "📅", 14: "🌟", 30: "👑", 60: "🔥"}
 
 # Типы подписки, у которых есть CDK
 CDK_SUPPORTED = {3, 30, 60}
@@ -69,32 +109,32 @@ CDK_ONLY = {60}
 
 # Паттерны CDK-ключей: (regex, days)
 CDK_PATTERNS = [
-    (re.compile(r"^3TG-[A-Z0-9]+$",                    re.IGNORECASE), 3),   # ⚡ 3 дня
+    (re.compile(r"^3TG-[A-Z0-9]+$",   re.IGNORECASE), 3),   # ⚡ 3 дня
     (re.compile(r"^bbg[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-                                                        re.IGNORECASE), 30),  # 👑 30 дней (1 мес)
-    (re.compile(r"^GGG-[A-Z0-9]+$",                    re.IGNORECASE), 60),  # 🔥 60 дней (2 мес)
+                                       re.IGNORECASE), 30),  # 👑 30 дней (1 мес)
+    (re.compile(r"^GGG-[A-Z0-9]+$",   re.IGNORECASE), 60),  # 🔥 60 дней (2 мес)
 ]
 
 HELP_TEXT = (
-    "📦 <b>Склад подписок</b>\n\n"
-    "➕ <b>Как добавлять:</b>\n"
-    "• <b>Grok-аккаунт</b> — любой формат email+пароль\n"
-    "  <code>mail@x.com|pass</code>  /  <code>mail@x.com:pass</code>\n"
-    "  <code>Email: mail@x.com\nPassword: pass</code>\n"
-    "• <b>CDK 3 дня</b>  — <code>3TG-XXXXXXXX</code>\n"
-    "• <b>CDK 30 дней</b> — <code>bbgXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</code>\n"
-    "• <b>CDK 60 дней</b> — <code>GGG-XXXXXXXXXXXXXXXXX</code>\n"
-    "  CDK распознаётся автоматически → сразу в нужный склад\n"
-    "• <b>Gemini</b> — ссылка <code>https://serviceactivation.google.com/...</code>\n"
-    "  → сразу в Gemini-склад\n\n"
-    "📤 <b>Как выдавать:</b>\n"
-    "Нажми <b>🤖 Grok</b> или <b>💎 Gemini</b> → выбери нужный тип\n\n"
-    "📋 /list — список Grok-аккаунтов\n"
-    "📊 /count — статистика всего склада\n"
-    "🗑 /use N — удалить аккаунт №N\n"
-    "⚠️ /clear — очистить Grok-склад\n"
-    "🔑 /settoken TOKEN — сменить токен бота\n\n"
-    "💡 Кнопки пропали? Отправь /start"
+    f"{CE_BOX} <b>Склад подписок</b>\n\n"
+    f"➕ <b>Как добавлять:</b>\n"
+    f"• <b>Grok-аккаунт</b> — любой формат email+пароль\n"
+    f"  <code>mail@x.com|pass</code>  /  <code>mail@x.com:pass</code>\n"
+    f"  <code>Email: mail@x.com\nPassword: pass</code>\n"
+    f"• <b>CDK 3 дня</b>  — <code>3TG-XXXXXXXX</code>\n"
+    f"• <b>CDK 30 дней</b> — <code>bbgXXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX</code>\n"
+    f"• <b>CDK 60 дней</b> — <code>GGG-XXXXXXXXXXXXXXXXX</code>\n"
+    f"  CDK распознаётся автоматически → сразу в нужный склад\n"
+    f"• <b>Gemini</b> — ссылка <code>https://serviceactivation.google.com/...</code>\n"
+    f"  → сразу в Gemini-склад\n\n"
+    f"{CE_OUT} <b>Как выдавать:</b>\n"
+    f"Нажми {CE_GROK} <b>Grok</b> или {CE_GEMINI} <b>Gemini</b> → выбери нужный тип\n\n"
+    f"{CE_LIST} /list — список Grok-аккаунтов\n"
+    f"{CE_COUNT} /count — статистика всего склада\n"
+    f"{CE_TRASH} /use N — удалить аккаунт №N\n"
+    f"{CE_WARN} /clear — очистить Grok-склад\n"
+    f"{CE_KEY} /settoken TOKEN — сменить токен бота\n\n"
+    f"{CE_TIP} Кнопки пропали? Отправь /start"
 )
 
 _lock = asyncio.Lock()
@@ -177,7 +217,8 @@ def parse_accounts(text: str) -> list[dict]:
 # ─── Форматирование ───────────────────────────────────────────────────────────
 
 def days_label(days: int) -> str:
-    return f"{DAYS_EMOJI.get(days, '📌')} {days}д"
+    """Метка срока для использования внутри HTML-сообщений."""
+    return f"{DAYS_EMOJI.get(days, CE_PIN)} {days}д"
 
 
 def format_account_block(a: dict) -> str:
@@ -196,8 +237,8 @@ def format_grok_list(accounts: list[dict]) -> str:
         groups.setdefault(d, []).append((i, a))
     lines = []
     for d in sorted(groups.keys()):
-        emoji = DAYS_EMOJI.get(d, "📌")
-        lines.append(f"\n{emoji} <b>{d} дней</b> — {len(groups[d])} шт.")
+        em = DAYS_EMOJI.get(d, CE_PIN)
+        lines.append(f"\n{em} <b>{d} дней</b> — {len(groups[d])} шт.")
         for idx, a in groups[d]:
             lines.append(
                 f"  {idx}. <code>{escape(a['email'])}</code>  |  "
@@ -209,6 +250,7 @@ def format_grok_list(accounts: list[dict]) -> str:
 # ─── Клавиатуры ───────────────────────────────────────────────────────────────
 
 def main_keyboard() -> ReplyKeyboardMarkup:
+    # Кнопки — plain text, HTML не работает
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🤖 Grok"),    KeyboardButton(text="💎 Gemini")],
@@ -223,14 +265,15 @@ MK = main_keyboard()
 
 
 def grok_days_keyboard() -> InlineKeyboardMarkup:
+    # Inline-кнопки — тоже plain text
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="⚡ 3 дня",    callback_data="grok_d:3",  style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton(text="📅 7 дней",   callback_data="grok_d:7",  style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="⚡ 3 дня",         callback_data="grok_d:3",  style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="📅 7 дней",        callback_data="grok_d:7",  style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="🌟 14 дней",  callback_data="grok_d:14", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="👑 30 дней",  callback_data="grok_d:30", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="🌟 14 дней",       callback_data="grok_d:14", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="👑 30 дней",       callback_data="grok_d:30", style=ButtonStyle.SUCCESS),
         ],
         [
             InlineKeyboardButton(text="🔥 60 дней (CDK)", callback_data="grok_d:60", style=ButtonStyle.SUCCESS),
@@ -243,14 +286,11 @@ def grok_type_keyboard(days: int, has_cdk: bool = True) -> InlineKeyboardMarkup:
     acc_btn = InlineKeyboardButton(
         text="📧 Аккаунт", callback_data=f"grok_acc:{days}", style=ButtonStyle.PRIMARY
     )
-    if has_cdk:
-        cdk_btn = InlineKeyboardButton(
-            text="🔑 CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS
-        )
-    else:
-        cdk_btn = InlineKeyboardButton(
-            text="🔑 CDK (скоро)", callback_data="grok_cdk_soon", style=ButtonStyle.DANGER
-        )
+    cdk_btn = InlineKeyboardButton(
+        text="🔑 CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS
+    ) if has_cdk else InlineKeyboardButton(
+        text="🔑 CDK (скоро)", callback_data="grok_cdk_soon", style=ButtonStyle.DANGER
+    )
     return InlineKeyboardMarkup(inline_keyboard=[
         [acc_btn, cdk_btn],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
@@ -289,8 +329,8 @@ async def cmd_start(message: Message):
         return
     await message.answer(HELP_TEXT, parse_mode="HTML")
     await message.answer(
-        "⌨️ <b>Панель управления</b>\n"
-        "<i>Не удаляй это сообщение — оно держит кнопки внизу.</i>",
+        f"{CE_KBD} <b>Панель управления</b>\n"
+        f"<i>Не удаляй это сообщение — оно держит кнопки внизу.</i>",
         parse_mode="HTML",
         reply_markup=MK,
     )
@@ -324,10 +364,10 @@ async def _send_count(message: Message) -> None:
     cdk_list   = load_cdk()
     gemini_lst = load_gemini()
 
-    lines = ["📊 <b>Склад подписок</b>\n"]
+    lines = [f"{CE_COUNT} <b>Склад подписок</b>\n"]
 
     # Grok accounts
-    lines.append("🤖 <b>Grok аккаунты:</b>")
+    lines.append(f"{CE_GROK} <b>Grok аккаунты:</b>")
     if accounts:
         bd: dict[int, int] = {}
         for a in accounts:
@@ -335,27 +375,27 @@ async def _send_count(message: Message) -> None:
             bd[d] = bd.get(d, 0) + 1
         for d in VALID_DAYS:
             if d in CDK_ONLY:
-                continue  # 60д — только CDK, аккаунтов нет
-            lines.append(f"  {DAYS_EMOJI.get(d,'📌')} {d}д: <b>{bd.get(d, 0)}</b> шт.")
+                continue
+            lines.append(f"  {DAYS_EMOJI.get(d, CE_PIN)} {d}д: <b>{bd.get(d, 0)}</b> шт.")
         lines.append(f"  Итого: <b>{len(accounts)}</b> шт.")
     else:
         lines.append("  <i>пусто</i>")
 
     # CDK
-    lines.append("\n🔑 <b>CDK коды:</b>")
+    lines.append(f"\n{CE_KEY} <b>CDK коды:</b>")
     if cdk_list:
         cbd: dict[int, int] = {}
         for c in cdk_list:
             d = c.get("days", 3)
             cbd[d] = cbd.get(d, 0) + 1
         for d, cnt in sorted(cbd.items()):
-            lines.append(f"  {DAYS_EMOJI.get(d,'📌')} {d}д: <b>{cnt}</b> шт.")
+            lines.append(f"  {DAYS_EMOJI.get(d, CE_PIN)} {d}д: <b>{cnt}</b> шт.")
         lines.append(f"  Итого: <b>{len(cdk_list)}</b> шт.")
     else:
         lines.append("  <i>пусто</i>")
 
     # Gemini
-    lines.append(f"\n💎 <b>Gemini ссылки:</b> <b>{len(gemini_lst)}</b> шт.")
+    lines.append(f"\n{CE_GEMINI} <b>Gemini ссылки:</b> <b>{len(gemini_lst)}</b> шт.")
     if not gemini_lst:
         lines.append("  <i>пусто</i>")
 
@@ -365,9 +405,9 @@ async def _send_count(message: Message) -> None:
 async def _send_list(message: Message) -> None:
     accounts = load_accounts()
     if not accounts:
-        await message.answer("📭 Grok-склад пустой.", reply_markup=MK)
+        await message.answer(f"{CE_EMPTY} Grok-склад пустой.", parse_mode="HTML", reply_markup=MK)
         return
-    full = f"📋 <b>Grok аккаунты — {len(accounts)} шт.</b>\n" + format_grok_list(accounts)
+    full = f"{CE_LIST} <b>Grok аккаунты — {len(accounts)} шт.</b>\n" + format_grok_list(accounts)
     for chunk_start in range(0, len(full), 3800):
         chunk = full[chunk_start:chunk_start + 3800]
         if chunk_start + 3800 >= len(full):
@@ -419,9 +459,9 @@ async def cmd_use(message: Message, command):
     parts = []
     if removed:
         lines = [f"  №{n}: {escape(a['email'])} {days_label(a.get('days',30))}" for n, a in sorted(removed)]
-        parts.append("🗑 <b>Удалены:</b>\n" + "\n".join(lines))
+        parts.append(f"{CE_TRASH} <b>Удалены:</b>\n" + "\n".join(lines))
     if skipped:
-        parts.append("⚠️ Не найдены: " + ", ".join(f"№{n}" for n in skipped))
+        parts.append(f"{CE_WARN} Не найдены: " + ", ".join(f"№{n}" for n in skipped))
     parts.append(f"<i>Осталось: {len(accounts)} шт.</i>")
     await message.answer("\n\n".join(parts), parse_mode="HTML", reply_markup=MK)
 
@@ -432,7 +472,7 @@ async def cmd_clear(message: Message):
         return
     pending_clear.add(message.from_user.id)
     await message.answer(
-        "⚠️ <b>Точно очистить ВСЁ Grok-хранилище?</b>\n/yes — подтвердить  |  /no — отмена",
+        f"{CE_WARN} <b>Точно очистить ВСЁ Grok-хранилище?</b>\n/yes — подтвердить  |  /no — отмена",
         parse_mode="HTML", reply_markup=MK,
     )
 
@@ -444,7 +484,7 @@ async def cmd_yes(message: Message):
         pending_clear.discard(message.from_user.id)
         async with _lock:
             save_accounts([])
-        await message.answer("✅ Grok-хранилище очищено.", reply_markup=MK)
+        await message.answer(f"{CE_OK} Grok-хранилище очищено.", parse_mode="HTML", reply_markup=MK)
 
 @dp.message(Command("no"))
 async def cmd_no(message: Message):
@@ -452,7 +492,7 @@ async def cmd_no(message: Message):
         return
     if message.from_user.id in pending_clear:
         pending_clear.discard(message.from_user.id)
-        await message.answer("❌ Отменено.", reply_markup=MK)
+        await message.answer(f"{CE_NO} Отменено.", parse_mode="HTML", reply_markup=MK)
 
 
 # ─── /settoken ────────────────────────────────────────────────────────────────
@@ -464,12 +504,11 @@ async def cmd_settoken(message: Message, command):
     new_token = (command.args or "").strip()
     if not new_token or ":" not in new_token:
         await message.answer(
-            "Использование: <code>/settoken НОВ_ТОКЕН</code>\nПолучи у @BotFather.",
+            f"{CE_KEY} Использование: <code>/settoken НОВ_ТОКЕН</code>\nПолучи у @BotFather.",
             parse_mode="HTML", reply_markup=MK,
         )
         return
 
-    # Ищем .env рядом с bot.py
     env_path = Path(__file__).parent / ".env"
     try:
         if env_path.exists():
@@ -487,10 +526,13 @@ async def cmd_settoken(message: Message, command):
         else:
             env_path.write_text(f"BOT_TOKEN={new_token}\nADMIN_ID={ADMIN_ID}\n", encoding="utf-8")
     except Exception as e:
-        await message.answer(f"❌ Не удалось обновить .env:\n<code>{escape(str(e))}</code>", parse_mode="HTML", reply_markup=MK)
+        await message.answer(
+            f"{CE_NO} Не удалось обновить .env:\n<code>{escape(str(e))}</code>",
+            parse_mode="HTML", reply_markup=MK,
+        )
         return
 
-    await message.answer("✅ Токен обновлён. Перезапускаю...", reply_markup=MK)
+    await message.answer(f"{CE_OK} Токен обновлён. Перезапускаю...", parse_mode="HTML", reply_markup=MK)
     try:
         subprocess.Popen(["sudo", "systemctl", "restart", "grok-bot"])
     except Exception:
@@ -506,14 +548,14 @@ async def cmd_pop(message: Message):
     accounts = load_accounts()
     cdk_list = load_cdk()
     if not accounts and not cdk_list:
-        await message.answer("📭 Grok-склад пустой.", reply_markup=MK)
+        await message.answer(f"{CE_EMPTY} Grok-склад пустой.", parse_mode="HTML", reply_markup=MK)
         return
     bd: dict[int, int] = {}
     for a in accounts:
         bd[a.get("days", 30)] = bd.get(a.get("days", 30), 0) + 1
-    summary = "  ".join(f"{DAYS_EMOJI.get(d,'📌')}{d}д:{cnt}" for d, cnt in sorted(bd.items()))
+    summary = "  ".join(f"{DAYS_EMOJI.get(d, CE_PIN)}{d}д:{cnt}" for d, cnt in sorted(bd.items()))
     await message.answer(
-        f"📦 <b>Grok — выбери срок:</b>\n<i>{summary}</i>",
+        f"{CE_BOX} <b>Grok — выбери срок:</b>\n<i>{summary}</i>",
         reply_markup=grok_days_keyboard(), parse_mode="HTML",
     )
 
@@ -523,13 +565,16 @@ async def _pop_by_days(message: Message, days: int) -> None:
         accounts = load_accounts()
         match = next((a for a in accounts if a.get("days", 30) == days), None)
         if not match:
-            await message.answer(f"📭 Нет Grok-аккаунтов на {days} дней.", reply_markup=MK)
+            await message.answer(
+                f"{CE_EMPTY} Нет Grok-аккаунтов на {days} дней.",
+                parse_mode="HTML", reply_markup=MK,
+            )
             return
         accounts.remove(match)
         save_accounts(accounts)
     remain = sum(1 for a in accounts if a.get("days", 30) == days)
     await message.answer(
-        f"📤 Grok [{days}д]:\n{format_account_block(match)}\n\n"
+        f"{CE_OUT} Grok [{days}д]:\n{format_account_block(match)}\n\n"
         f"<i>Осталось {days}д: {remain} шт.</i>",
         parse_mode="HTML", reply_markup=MK,
     )
@@ -577,7 +622,7 @@ async def handle_grok_button(message: Message):
     for d in VALID_DAYS:
         acc_cnt = acc_bd.get(d, 0)
         cdk_cnt = cdk_bd.get(d, 0)
-        em = DAYS_EMOJI.get(d, "📌")
+        em = DAYS_EMOJI.get(d, CE_PIN)
         if d in CDK_ONLY:
             lines.append(f"{em} {d}д: CDK {cdk_cnt} (только CDK)")
         elif d in CDK_SUPPORTED:
@@ -585,7 +630,7 @@ async def handle_grok_button(message: Message):
         else:
             lines.append(f"{em} {d}д: акк {acc_cnt}")
     await message.answer(
-        "🤖 <b>Grok — выбери срок подписки:</b>\n" + "\n".join(lines),
+        f"{CE_GROK} <b>Grok — выбери срок подписки:</b>\n" + "\n".join(lines),
         reply_markup=grok_days_keyboard(), parse_mode="HTML",
     )
 
@@ -597,13 +642,16 @@ async def handle_gemini_button(message: Message):
     async with _lock:
         gemini_lst = load_gemini()
         if not gemini_lst:
-            await message.answer("📭 Нет Gemini-ссылок в хранилище.", reply_markup=MK)
+            await message.answer(
+                f"{CE_EMPTY} Нет Gemini-ссылок в хранилище.",
+                parse_mode="HTML", reply_markup=MK,
+            )
             return
         item = gemini_lst.pop(0)
         save_gemini(gemini_lst)
     url = item.get("url", "")
     await message.answer(
-        f"💎 <b>Gemini:</b>\n{url}\n\n"
+        f"{CE_GEMINI} <b>Gemini:</b>\n{url}\n\n"
         f"<i>Осталось: {len(gemini_lst)} шт.</i>",
         parse_mode="HTML", reply_markup=MK,
     )
@@ -636,12 +684,11 @@ async def cb_grok_days(cb: CallbackQuery):
     await cb.answer()
 
     if days in CDK_ONLY:
-        # 60 дней — только CDK, аккаунтов нет
         cdk_list = load_cdk()
         cdk_cnt = sum(1 for c in cdk_list if c.get("days") == days)
         await cb.message.edit_text(
             f"{DAYS_EMOJI[days]} <b>{days} дней — только CDK:</b>\n"
-            f"🔑 CDK в наличии: {cdk_cnt} шт.",
+            f"{CE_KEY} CDK в наличии: {cdk_cnt} шт.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🔑 Получить CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS)],
                 [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
@@ -649,18 +696,16 @@ async def cb_grok_days(cb: CallbackQuery):
             parse_mode="HTML",
         )
     elif days in CDK_SUPPORTED:
-        # 3 и 30 дней — аккаунты + CDK
         accounts = load_accounts()
         cdk_list = load_cdk()
         acc_cnt = sum(1 for a in accounts if a.get("days", 30) == days)
         cdk_cnt = sum(1 for c in cdk_list if c.get("days") == days)
         await cb.message.edit_text(
             f"{DAYS_EMOJI[days]} <b>{days} дней — выбери тип:</b>\n"
-            f"📧 Аккаунты: {acc_cnt} шт.   🔑 CDK: {cdk_cnt} шт.",
+            f"{CE_EMAIL} Аккаунты: {acc_cnt} шт.   {CE_KEY} CDK: {cdk_cnt} шт.",
             reply_markup=grok_type_keyboard(days, has_cdk=True), parse_mode="HTML",
         )
     else:
-        # 7 и 14 дней — только аккаунты, сразу выдаём
         await _cb_pop_account(cb, days)
 
 
@@ -676,11 +721,11 @@ async def _cb_pop_account(cb: CallbackQuery, days: int) -> None:
         save_accounts(accounts)
     remain = sum(1 for a in accounts if a.get("days", 30) == days)
     await cb.message.edit_text(
-        f"📤 <b>Grok [{days}д] — аккаунт:</b>\n{format_account_block(match)}\n\n"
+        f"{CE_OUT} <b>Grok [{days}д] — аккаунт:</b>\n{format_account_block(match)}\n\n"
         f"<i>Осталось {days}д: {remain} шт.</i>",
         parse_mode="HTML",
     )
-    await cb.message.answer("⬆️ Выдан выше", reply_markup=MK)
+    await cb.message.answer(f"{CE_UP} Выдан выше", parse_mode="HTML", reply_markup=MK)
 
 
 @dp.callback_query(F.data.startswith("grok_acc:"))
@@ -714,12 +759,11 @@ async def cb_grok_cdk(cb: CallbackQuery):
     remain = sum(1 for c in cdk_list if c.get("days", 3) == days)
     await cb.answer("✅ CDK выдан!")
     await cb.message.edit_text(
-        f"🔑 <b>Grok CDK [{days}д]:</b>\n<code>{escape(match['code'])}</code>\n\n"
+        f"{CE_KEY} <b>Grok CDK [{days}д]:</b>\n<code>{escape(match['code'])}</code>\n\n"
         f"<i>Осталось CDK {days}д: {remain} шт.</i>",
         parse_mode="HTML",
     )
-    await cb.message.answer("⬆️ CDK выдан выше", reply_markup=MK)
-
+    await cb.message.answer(f"{CE_UP} CDK выдан выше", parse_mode="HTML", reply_markup=MK)
 
 
 @dp.callback_query(F.data == "grok_cancel")
@@ -727,7 +771,7 @@ async def cb_grok_cancel(cb: CallbackQuery):
     if not is_admin_cb(cb):
         return
     await cb.answer("Отменено.")
-    await cb.message.edit_text("❌ Отменено.")
+    await cb.message.edit_text(f"{CE_NO} Отменено.", parse_mode="HTML")
     await cb.message.answer("Отменено.", reply_markup=MK)
 
 
@@ -758,13 +802,12 @@ async def cb_add_days(cb: CallbackQuery):
                 existing.add(a["email"].lower())
                 added += 1
         save_accounts(accounts)
-    emoji = DAYS_EMOJI.get(days, "📌")
-    msg = f"✅ Добавлено: <b>{added}</b> шт. {emoji} {days}д"
+    em = DAYS_EMOJI.get(days, CE_PIN)
+    msg = f"{CE_OK} Добавлено: <b>{added}</b> шт. {em} {days}д"
     if dupes:
-        msg += f"\n⚠️ Дублей пропущено: {dupes}"
+        msg += f"\n{CE_WARN} Дублей пропущено: {dupes}"
     msg += f"\n<i>Всего в Grok-складе: {len(accounts)} шт.</i>"
     await cb.answer(f"Добавлено {added} шт.")
-    # БАГ-ФИКС: только edit_text, убрали дублирующий answer
     await cb.message.edit_text(msg, parse_mode="HTML")
 
 
@@ -774,7 +817,7 @@ async def cb_add_cancel(cb: CallbackQuery):
         return
     pending_add.pop(cb.from_user.id, None)
     await cb.answer("Отменено.")
-    await cb.message.edit_text("❌ Добавление отменено.")
+    await cb.message.edit_text(f"{CE_NO} Добавление отменено.", parse_mode="HTML")
 
 
 # ─── Универсальный обработчик входящего текста ────────────────────────────────
@@ -811,13 +854,13 @@ async def handle_text(message: Message):
             save_cdk(cdk_list)
         if added:
             detail = "  ".join(
-                f"{DAYS_EMOJI.get(d,'📌')}{d}д: {cnt}" for d, cnt in sorted(by_days.items())
+                f"{DAYS_EMOJI.get(d, CE_PIN)}{d}д: {cnt}" for d, cnt in sorted(by_days.items())
             )
-            msg = f"🔑 CDK добавлено: <b>{added}</b> шт. ({detail})"
+            msg = f"{CE_KEY} CDK добавлено: <b>{added}</b> шт. ({detail})"
         else:
-            msg = "🔑 CDK: все коды уже были в хранилище."
+            msg = f"{CE_KEY} CDK: все коды уже были в хранилище."
         if dupes:
-            msg += f"\n⚠️ Дублей: {dupes}"
+            msg += f"\n{CE_WARN} Дублей: {dupes}"
         msg += f"\n<i>Всего CDK: {len(cdk_list)} шт.</i>"
         await message.answer(msg, parse_mode="HTML", reply_markup=MK)
         return
@@ -837,9 +880,9 @@ async def handle_text(message: Message):
                     existing.add(url)
                     added += 1
             save_gemini(gemini_lst)
-        msg = f"💎 Gemini добавлено: <b>{added}</b> шт."
+        msg = f"{CE_GEMINI} Gemini добавлено: <b>{added}</b> шт."
         if dupes:
-            msg += f"\n⚠️ Дублей: {dupes}"
+            msg += f"\n{CE_WARN} Дублей: {dupes}"
         msg += f"\n<i>Всего Gemini: {len(gemini_lst)} шт.</i>"
         await message.answer(msg, parse_mode="HTML", reply_markup=MK)
         return
@@ -848,15 +891,15 @@ async def handle_text(message: Message):
     parsed = parse_accounts(text)
     if not parsed:
         await message.answer(
-            "Не нашёл аккаунтов, CDK или ссылок.\n/help — справка",
-            reply_markup=MK,
+            f"Не нашёл аккаунтов, CDK или ссылок.\n{CE_HELP} /help — справка",
+            parse_mode="HTML", reply_markup=MK,
         )
         return
     if message.from_user.id in pending_add:
-        await message.answer("⚠️ Предыдущая партия заменена новой.")
+        await message.answer(f"{CE_WARN} Предыдущая партия заменена новой.", parse_mode="HTML")
     pending_add[message.from_user.id] = parsed
     await message.answer(
-        f"📥 Найдено <b>{len(parsed)}</b> Grok-аккаунт(ов). Выбери срок подписки:",
+        f"{CE_IN} Найдено <b>{len(parsed)}</b> Grok-аккаунт(ов). Выбери срок подписки:",
         reply_markup=add_days_keyboard(), parse_mode="HTML",
     )
 
