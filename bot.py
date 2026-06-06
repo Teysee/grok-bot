@@ -39,34 +39,61 @@ def _e(eid: str, fb: str) -> str:
     """Обернуть кастомный эмодзи Telegram в HTML-тег."""
     return f'<tg-emoji emoji-id="{eid}">{fb}</tg-emoji>'
 
-# Главное меню / разделы
-CE_GROK   = _e("5319288443153445517", "🤖")
-CE_GEMINI = _e("5321197740800120767", "💎")
-CE_LIST   = _e("5251308525426075254", "📋")
-CE_COUNT  = _e("5251579679596372458", "📊")
-CE_HELP   = _e("5251588462804491181", "❓")
+# Главное меню / разделы — сначала ID (для иконок кнопок), потом HTML-обёртки
+ID_GROK   = "5319288443153445517"
+ID_GEMINI = "5321197740800120767"
+ID_LIST   = "5251308525426075254"
+ID_COUNT  = "5251579679596372458"
+ID_HELP   = "5251588462804491181"
 # Действия
-CE_BOX    = _e("5251382119690688965", "📦")
-CE_OUT    = _e("5251748480401036448", "📤")
-CE_IN     = _e("5251748480401036448", "📥")
-CE_EMPTY  = _e("5251650168599632938", "📭")
-CE_OK     = _e("5251468620332032765", "✅")
-CE_NO     = _e("5249143075929873801", "❌")
-CE_WARN   = _e("5251753939304471410", "⚠️")
-CE_TRASH  = _e("5251625210544677220", "🗑")
-CE_KEY    = _e("5251329076844584285", "🔑")
-CE_EMAIL  = _e("5251519597298868587", "📧")
-CE_UP     = _e("5251625880559574052", "⬆️")
-CE_TIP    = _e("5251621409498619170", "💡")
-CE_KBD    = _e("5251317888454777310", "⌨️")
-CE_HOME   = _e("5251606986998439430", "🏠")
-CE_PIN    = _e("5251504131121634870", "📌")
+ID_BOX    = "5251382119690688965"
+ID_OUT    = "5251748480401036448"
+ID_IN     = "5251748480401036448"
+ID_EMPTY  = "5251650168599632938"
+ID_OK     = "5251468620332032765"
+ID_NO     = "5249143075929873801"
+ID_WARN   = "5251753939304471410"
+ID_TRASH  = "5251625210544677220"
+ID_KEY    = "5251329076844584285"
+ID_EMAIL  = "5251519597298868587"
+ID_UP     = "5251625880559574052"
+ID_TIP    = "5251621409498619170"
+ID_KBD    = "5251317888454777310"
+ID_HOME   = "5251606986998439430"
+ID_PIN    = "5251504131121634870"
 # Дни подписки
-CE_D3   = _e("5251356470145996194", "⚡")
-CE_D7   = _e("5251521246566307049", "📅")
-CE_D14  = _e("5251307915540716107", "🌟")
-CE_D30  = _e("5251443675161976035", "👑")
-CE_D60  = _e("5249101449106840434", "🔥")
+ID_D3   = "5251356470145996194"
+ID_D7   = "5251521246566307049"
+ID_D14  = "5251307915540716107"
+ID_D30  = "5251443675161976035"
+ID_D60  = "5249101449106840434"
+
+# HTML-обёртки (для текста сообщений, parse_mode="HTML")
+CE_GROK   = _e(ID_GROK,   "🤖")
+CE_GEMINI = _e(ID_GEMINI, "💎")
+CE_LIST   = _e(ID_LIST,   "📋")
+CE_COUNT  = _e(ID_COUNT,  "📊")
+CE_HELP   = _e(ID_HELP,   "❓")
+CE_BOX    = _e(ID_BOX,    "📦")
+CE_OUT    = _e(ID_OUT,    "📤")
+CE_IN     = _e(ID_IN,     "📥")
+CE_EMPTY  = _e(ID_EMPTY,  "📭")
+CE_OK     = _e(ID_OK,     "✅")
+CE_NO     = _e(ID_NO,     "❌")
+CE_WARN   = _e(ID_WARN,   "⚠️")
+CE_TRASH  = _e(ID_TRASH,  "🗑")
+CE_KEY    = _e(ID_KEY,    "🔑")
+CE_EMAIL  = _e(ID_EMAIL,  "📧")
+CE_UP     = _e(ID_UP,     "⬆️")
+CE_TIP    = _e(ID_TIP,    "💡")
+CE_KBD    = _e(ID_KBD,    "⌨️")
+CE_HOME   = _e(ID_HOME,   "🏠")
+CE_PIN    = _e(ID_PIN,    "📌")
+CE_D3   = _e(ID_D3,  "⚡")
+CE_D7   = _e(ID_D7,  "📅")
+CE_D14  = _e(ID_D14, "🌟")
+CE_D30  = _e(ID_D30, "👑")
+CE_D60  = _e(ID_D60, "🔥")
 
 
 # ─── Паттерны парсинга аккаунтов ─────────────────────────────────────────────
@@ -240,12 +267,19 @@ def format_grok_list(accounts: list[dict]) -> str:
 # ─── Клавиатуры ───────────────────────────────────────────────────────────────
 
 def main_keyboard() -> ReplyKeyboardMarkup:
-    # Кнопки — plain text, HTML не работает
+    # Кастомные эмодзи на кнопках через icon_custom_emoji_id (Bot API 9.4+).
+    # Текст обработчиков ловится по подстроке, эмодзи-иконка отдельно.
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🤖 Grok"),    KeyboardButton(text="💎 Gemini")],
-            [KeyboardButton(text="📋 Список"),  KeyboardButton(text="📊 Счёт")],
-            [KeyboardButton(text="❓ Помощь")],
+            [
+                KeyboardButton(text="Grok",   icon_custom_emoji_id=ID_GROK),
+                KeyboardButton(text="Gemini", icon_custom_emoji_id=ID_GEMINI),
+            ],
+            [
+                KeyboardButton(text="Список", icon_custom_emoji_id=ID_LIST),
+                KeyboardButton(text="Счёт",   icon_custom_emoji_id=ID_COUNT),
+            ],
+            [KeyboardButton(text="Помощь",    icon_custom_emoji_id=ID_HELP)],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -258,46 +292,46 @@ def grok_days_keyboard() -> InlineKeyboardMarkup:
     # Inline-кнопки — тоже plain text
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="⚡ 3 дня",         callback_data="grok_d:3",  style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton(text="📅 7 дней",        callback_data="grok_d:7",  style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="3 дня",         callback_data="grok_d:3",  style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_D3),
+            InlineKeyboardButton(text="7 дней",        callback_data="grok_d:7",  style=ButtonStyle.PRIMARY, icon_custom_emoji_id=ID_D7),
         ],
         [
-            InlineKeyboardButton(text="🌟 14 дней",       callback_data="grok_d:14", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="👑 30 дней",       callback_data="grok_d:30", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="14 дней",       callback_data="grok_d:14", style=ButtonStyle.PRIMARY, icon_custom_emoji_id=ID_D14),
+            InlineKeyboardButton(text="30 дней",       callback_data="grok_d:30", style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_D30),
         ],
         [
-            InlineKeyboardButton(text="🔥 60 дней (CDK)", callback_data="grok_d:60", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="60 дней (CDK)", callback_data="grok_d:60", style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_D60),
         ],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
+        [InlineKeyboardButton(text="Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER, icon_custom_emoji_id=ID_NO)],
     ])
 
 
 def grok_type_keyboard(days: int, has_cdk: bool = True) -> InlineKeyboardMarkup:
     acc_btn = InlineKeyboardButton(
-        text="📧 Аккаунт", callback_data=f"grok_acc:{days}", style=ButtonStyle.PRIMARY
+        text="Аккаунт", callback_data=f"grok_acc:{days}", style=ButtonStyle.PRIMARY, icon_custom_emoji_id=ID_EMAIL
     )
     cdk_btn = InlineKeyboardButton(
-        text="🔑 CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS
+        text="CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_KEY
     ) if has_cdk else InlineKeyboardButton(
-        text="🔑 CDK (скоро)", callback_data="grok_cdk_soon", style=ButtonStyle.DANGER
+        text="CDK (скоро)", callback_data="grok_cdk_soon", style=ButtonStyle.DANGER, icon_custom_emoji_id=ID_KEY
     )
     return InlineKeyboardMarkup(inline_keyboard=[
         [acc_btn, cdk_btn],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
+        [InlineKeyboardButton(text="Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER, icon_custom_emoji_id=ID_NO)],
     ])
 
 
 def add_days_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="⚡ 3 дня",   callback_data="add_days:3",  style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton(text="📅 7 дней",  callback_data="add_days:7",  style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="3 дня",   callback_data="add_days:3",  style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_D3),
+            InlineKeyboardButton(text="7 дней",  callback_data="add_days:7",  style=ButtonStyle.PRIMARY, icon_custom_emoji_id=ID_D7),
         ],
         [
-            InlineKeyboardButton(text="🌟 14 дней", callback_data="add_days:14", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="👑 30 дней", callback_data="add_days:30", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="14 дней", callback_data="add_days:14", style=ButtonStyle.PRIMARY, icon_custom_emoji_id=ID_D14),
+            InlineKeyboardButton(text="30 дней", callback_data="add_days:30", style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_D30),
         ],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="add_cancel", style=ButtonStyle.DANGER)],
+        [InlineKeyboardButton(text="Отмена", callback_data="add_cancel", style=ButtonStyle.DANGER, icon_custom_emoji_id=ID_NO)],
     ])
 
 
@@ -625,7 +659,7 @@ async def cmd_30day(message: Message):
 
 # ─── Кнопки reply-клавиатуры ─────────────────────────────────────────────────
 
-@dp.message(F.text == "🤖 Grok")
+@dp.message(F.text.in_({"Grok", "🤖 Grok"}))
 async def handle_grok_button(message: Message):
     if not is_admin(message):
         return
@@ -657,7 +691,7 @@ async def handle_grok_button(message: Message):
     )
 
 
-@dp.message(F.text == "💎 Gemini")
+@dp.message(F.text.in_({"Gemini", "💎 Gemini"}))
 async def handle_gemini_button(message: Message):
     if not is_admin(message):
         return
@@ -679,17 +713,17 @@ async def handle_gemini_button(message: Message):
     )
 
 
-@dp.message(F.text == "📋 Список")
+@dp.message(F.text.in_({"Список", "📋 Список"}))
 async def handle_list_button(message: Message):
     if not is_admin(message): return
     await _send_list(message)
 
-@dp.message(F.text == "📊 Счёт")
+@dp.message(F.text.in_({"Счёт", "📊 Счёт"}))
 async def handle_count_button(message: Message):
     if not is_admin(message): return
     await _send_count(message)
 
-@dp.message(F.text == "❓ Помощь")
+@dp.message(F.text.in_({"Помощь", "❓ Помощь"}))
 async def handle_help_button(message: Message):
     if not is_admin(message): return
     await message.answer(HELP_TEXT, parse_mode="HTML", reply_markup=MK)
@@ -712,8 +746,8 @@ async def cb_grok_days(cb: CallbackQuery):
             f"{DAYS_EMOJI[days]} <b>{days} дней — только CDK:</b>\n"
             f"{CE_KEY} CDK в наличии: {cdk_cnt} шт.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔑 Получить CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS)],
-                [InlineKeyboardButton(text="❌ Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER)],
+                [InlineKeyboardButton(text="Получить CDK", callback_data=f"grok_cdk:{days}", style=ButtonStyle.SUCCESS, icon_custom_emoji_id=ID_KEY)],
+                [InlineKeyboardButton(text="Отмена", callback_data="grok_cancel", style=ButtonStyle.DANGER, icon_custom_emoji_id=ID_NO)],
             ]),
             parse_mode="HTML",
         )
