@@ -830,7 +830,6 @@ async def cb_grok_cancel(cb: CallbackQuery):
         return
     await cb.answer("Отменено.")
     await cb.message.edit_text(f"{CE_NO} Отменено.", parse_mode="HTML")
-    await cb.message.answer("Отменено.", reply_markup=MK)
 
 
 # ─── Добавление аккаунтов (inline callback) ───────────────────────────────────
